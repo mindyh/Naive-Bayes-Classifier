@@ -6,6 +6,10 @@ using namespace std;
 
 #define NUM_CLASSIFICATIONS 2
 #define NUM_INDICATOR_OUTCOMES 2
+#define IS_MAP true
+#define IS_MLE false
+
+
 
 vector<double **> setupModel(int numVariables)
 {
@@ -16,7 +20,7 @@ vector<double **> setupModel(int numVariables)
 		double **x = new double*[NUM_INDICATOR_OUTCOMES];
 		x[0] = new double[NUM_INDICATOR_OUTCOMES * NUM_CLASSIFICATIONS];
 		
-		for (int j = 0; j < NUM_INDICATOR_OUTCOMES; i++) 
+		for (int j = 0; j < NUM_INDICATOR_OUTCOMES; j++) 
 			x[j] = x[0] + j * NUM_CLASSIFICATIONS;
 
 		model[i] = x;
@@ -25,7 +29,7 @@ vector<double **> setupModel(int numVariables)
 	return model;
 }
 
-void getMLE(vector<double **> model, int numPerVector, int numVectors, ifstream &file, double *outcomeVector)
+void readModel(vector<double **> model, int numPerVector, int numVectors, ifstream &file, double *outcomeVector)
 {
 	int currBin;
 	int *currVector = new int[numPerVector];
@@ -64,23 +68,17 @@ void normalizeVectors(vector<double **> model, double *outcomeVector, int numVar
 		outcomeVector[i] /= denominator;
 }
 
-void buildMLE (vector<double **> model, int numVariables, int numVectors, ifstream &file, double *outcomeVector) 
-{
-	getMLE(model, numVariables, numVectors, file, outcomeVector);
-	normalizeVectors(model, outcomeVector, numVariables, numVariables*numVectors);
-}
-
 void initOutcomeVector(double *vector)
 {
 	for(int i = 0; i < NUM_CLASSIFICATIONS; i++) vector[i] = 0;
 }
 
-void initModel(vector<double **> model, int numVariables)
+void initModel(vector<double **> model, bool isMAP, int numVariables)
 {
 	for (int i = 0; i < numVariables; i++)
 		for(int j = 0; j < NUM_INDICATOR_OUTCOMES; j++)
 			for(int k = 0; k < NUM_CLASSIFICATIONS; k++)
-				model[i][j][k] = 0;
+				model[i][j][k] = isMAP ? 1 : 0;
 }
 
 void cleanupModel(vector<double **> model, int numVariables)
@@ -92,6 +90,16 @@ void cleanupModel(vector<double **> model, int numVariables)
 	}
 }
 
+void trainModel(bool isMAP, vector<double **>model, double *outcomeVector, int numVariables, int numVectors, ifstream &file)
+{
+	initModel(model, isMAP, numVariables);
+	initOutcomeVector(outcomeVector);
+	readModel(model, numVariables, numVectors, file, outcomeVector);
+
+	int denominator = isMAP ? numVectors + NUM_INDICATOR_OUTCOMES*NUM_CLASSIFICATIONS : numVectors;
+	normalizeVectors(model, outcomeVector, numVariables, denominator);
+}
+
 int main()
 {
 /*	ifstream hearttest("datasets/heart-test.txt");
@@ -101,19 +109,18 @@ int main()
 	ifstream simpleTrain("datasets/simple-train.txt");
 
 	int numVariables, numVectors;
-
 	simpleTrain >> numVariables >> numVectors;
 
 	double outcomeVector[NUM_CLASSIFICATIONS];
-	initOutcomeVector(outcomeVector);
-	
 	vector<double **> model = setupModel(numVariables);
-	initModel(model, numVariables);
-	buildMLE(model, numVariables, numVectors, simpleTrain, outcomeVector);
+
+	/* train and test MLE model */
+	trainModel(IS_MLE, model, outcomeVector, numVariables, numVectors, simpleTrain);
+	/* test MLE model */
+
+	cout << model[1][1][1] << endl;
  
 	//testMLE(model,
-	
-
 
 	cout << numVariables << " " << numVectors << endl;
 	cout << "finished" << endl;
