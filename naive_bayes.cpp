@@ -1,25 +1,31 @@
 #include<string>
+#include<vector>
 #include<iostream>
 #include<fstream>
 using namespace std;
 
-#define NUM_OUTCOMES 2
+#define NUM_CLASSIFICATIONS 2
+#define NUM_INDICATOR_OUTCOMES 2
 
-double ** setupModel(int numPerVector, int numVectors)
+vector<double **> setupModel(int numVariables)
 {
-	double **model = new double*[numPerVector];
-	model[0] = new double[numPerVector * NUM_OUTCOMES];
-	for (int i = 1; i < numPerVector; i++)
-		model[i] = model[0] + i * NUM_OUTCOMES;
+	vector<double **> model(numVariables);
 
-	for (int i = 0; i < numPerVector; i++)
-		for(int j = 0; j < NUM_OUTCOMES; j++)
-			model[i][j] = 0;
+	for(int i = 0; i < numVariables; i++)
+	{
+		double **x = new double*[NUM_INDICATOR_OUTCOMES];
+		x[0] = new double[NUM_INDICATOR_OUTCOMES * NUM_CLASSIFICATIONS];
+		
+		for (int j = 0; j < NUM_INDICATOR_OUTCOMES; i++) 
+			x[j] = x[0] + j * NUM_CLASSIFICATIONS;
+
+		model[i] = x;
+	}
 
 	return model;
 }
 
-void getMLE(double ** model, int numPerVector, int &currBin, int *currVector, ifstream &file)
+void getMLE(vector<double **> model, int numPerVector, int numVectors, ifstream &file, double *outcomeVector)
 {
 	int currBin;
 	int *currVector = new int[numPerVector];
@@ -37,49 +43,82 @@ void getMLE(double ** model, int numPerVector, int &currBin, int *currVector, if
 			
 		/* add the vector to the model */
 		for(int j = 0; j < numPerVector; j++)
-			model[j][currBin]++;
+			model[j][currVector[j]][currBin]++;
+
+		outcomeVector[currBin]++;
 	}
 
 	delete []currVector;	
 }
 
-void normalizeModel(int ** model, int numPerVector, int denominator) 
+void normalizeVectors(vector<double **> model, double *outcomeVector, int numVariables, int denominator) 
 {
-	for(int i = 0; i < numPerVector; i++)
-		for(int j = 0y j < NUM_OUTCOMES; j++)
-			model[i][j] /= numDataPoints;
+	/* Normalize model vectors */
+	for(int i = 0; i < numVariables; i++)
+		for(int j = 0; j < NUM_INDICATOR_OUTCOMES; j++)
+			for(int k = 0; k < NUM_CLASSIFICATIONS; k++)
+				model[i][j][k] /= denominator;
+
+	/* Normalize outcome vector */
+	for(int i = 0; i < NUM_CLASSIFICATIONS; i++)
+		outcomeVector[i] /= denominator;
 }
 
-void buildMLE (double ** model, int numPerVector, int numVectors, ifstream &file) 
+void buildMLE (vector<double **> model, int numVariables, int numVectors, ifstream &file, double *outcomeVector) 
 {
-	getMLE(model, numPerVector, currBin, currVector, file);
-	normalizeMLE(model, numPerVector * numVectors);
+	getMLE(model, numVariables, numVectors, file, outcomeVector);
+	normalizeVectors(model, outcomeVector, numVariables, numVariables*numVectors);
 }
 
+void initOutcomeVector(double *vector)
+{
+	for(int i = 0; i < NUM_CLASSIFICATIONS; i++) vector[i] = 0;
+}
+
+void initModel(vector<double **> model, int numVariables)
+{
+	for (int i = 0; i < numVariables; i++)
+		for(int j = 0; j < NUM_INDICATOR_OUTCOMES; j++)
+			for(int k = 0; k < NUM_CLASSIFICATIONS; k++)
+				model[i][j][k] = 0;
+}
+
+void cleanupModel(vector<double **> model, int numVariables)
+{
+	for(int i = 0; i < numVariables; i++)
+	{
+		delete [] model[i][0];
+		delete [] model[i];
+	}
+}
 
 int main()
 {
 /*	ifstream hearttest("datasets/heart-test.txt");
 	ifstream hearttrain("datasets/heart-train.txt")*/;
 
-	//ifstream simpleTest("datasets/simple-test.txt");
+	ifstream simpleTest("datasets/simple-test.txt");
 	ifstream simpleTrain("datasets/simple-train.txt");
 
-	int numPerVector, numVectors;
+	int numVariables, numVectors;
 
-	simpleTrain >> numPerVector >> numVectors;
+	simpleTrain >> numVariables >> numVectors;
 
-	double ** model = setupModel(numPerVector, numVectors);
-	buildMLE(model, numPerVector, numVectors, simpleTrain);
+	double outcomeVector[NUM_CLASSIFICATIONS];
+	initOutcomeVector(outcomeVector);
+	
+	vector<double **> model = setupModel(numVariables);
+	initModel(model, numVariables);
+	buildMLE(model, numVariables, numVectors, simpleTrain, outcomeVector);
+ 
+	//testMLE(model,
+	
 
 
-
-
-	cout << numPerVector << " " << numVectors << endl;
+	cout << numVariables << " " << numVectors << endl;
 	cout << "finished" << endl;
 
-	delete [] model[0];
-	delete [] model;
+	cleanupModel(model, numVariables);
 
 	/* prevent command window from closing */
 	getchar();
