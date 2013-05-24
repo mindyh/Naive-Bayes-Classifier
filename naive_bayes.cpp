@@ -2,6 +2,7 @@
 #include<vector>
 #include<iostream>
 #include<fstream>
+#include<math.h>
 using namespace std;
 
 #define NUM_CLASSIFICATIONS 2
@@ -9,7 +10,9 @@ using namespace std;
 #define IS_MAP true
 #define IS_MLE false
 
-
+/** The model is setup as such:
+ *		model[the indicator variable][the outcome of the indicator][the outcome of the vector as a whole]
+ */
 
 vector<double **> setupModel(int numVariables)
 {
@@ -29,26 +32,31 @@ vector<double **> setupModel(int numVariables)
 	return model;
 }
 
-void readModel(vector<double **> model, int numPerVector, int numVectors, ifstream &file, double *outcomeVector)
+int getResult(ifstream &file){
+	string line;
+	getline(file, line);
+	return line[line.length() - 1] - '0'; // last character on the line, guaranteed. Convert from char to int
+}
+
+void readModel(vector<double **> model, int numVariables, int numVectors, ifstream &file, double *outcomeVector)
 {
 	int currBin;
-	int *currVector = new int[numPerVector];
+	int *currVector = new int[numVariables];
 
 	for(int i = 0; i < numVectors; i++)
 	{
 		/* get the vector */
-		for(int j = 0; j < numPerVector; j++)
+		for(int j = 0; j < numVariables; j++)
 			file >> currVector[j];
 
 		/* get the binary output of the vector */
-		string line;
-		getline(file, line);
-		currBin = line[line.length() - 1] - '0'; // last character on the line, guaranteed. Convert from char to int
+		currBin = getResult(file);
 			
 		/* add the vector to the model */
-		for(int j = 0; j < numPerVector; j++)
+		for(int j = 0; j < numVariables; j++)
 			model[j][currVector[j]][currBin]++;
 
+		/* update the outcome vector */
 		outcomeVector[currBin]++;
 	}
 
@@ -68,11 +76,6 @@ void normalizeVectors(vector<double **> model, double *outcomeVector, int numVar
 		outcomeVector[i] /= denominator;
 }
 
-void initOutcomeVector(double *vector)
-{
-	for(int i = 0; i < NUM_CLASSIFICATIONS; i++) vector[i] = 0;
-}
-
 void initModel(vector<double **> model, bool isMAP, int numVariables)
 {
 	for (int i = 0; i < numVariables; i++)
@@ -90,44 +93,139 @@ void cleanupModel(vector<double **> model, int numVariables)
 	}
 }
 
-void trainModel(bool isMAP, vector<double **>model, double *outcomeVector, int numVariables, int numVectors, ifstream &file)
+void initArray(double *arr, int numElem, int value)
 {
+	for(int i = 0; i < numElem; i++) arr[i] = value;
+}
+
+void trainModel(bool isMAP, vector<double **>model, double *outcomeVector, int numVariables, ifstream &file)
+{
+	int numVectors;
+	file >> numVectors;
+	
 	initModel(model, isMAP, numVariables);
-	initOutcomeVector(outcomeVector);
+	initArray(outcomeVector, NUM_CLASSIFICATIONS, 0);
 	readModel(model, numVariables, numVectors, file, outcomeVector);
 
 	int denominator = isMAP ? numVectors + NUM_INDICATOR_OUTCOMES*NUM_CLASSIFICATIONS : numVectors;
 	normalizeVectors(model, outcomeVector, numVariables, denominator);
 }
 
+int getMax(double *arr, int size)
+{
+	int maxIndex = 0;
+	for (int i = 0; i < size; i++)
+	{
+		if(arr[i] > arr[maxIndex]) maxIndex = i;
+	}
+
+	return maxIndex;
+}
+
+void calculateProbabilities(vector<double **>model, double *outcomeVector, double *probability, int *currVector, int numVariables)
+{
+	for(int j = 0; j < NUM_CLASSIFICATIONS; j++) // get the probability for this classification
+	{
+		for(int k = 0; k < numVariables; k++) // given these indicators, calculate the naive bayes probability
+			probability[j] += log(model[k][currVector[k]][j] / outcomeVector[j]);
+		probability[j] += log(outcomeVector[j]);
+	}
+}
+
+void testModel(vector<double **>model, double *outcomeVector, ifstream &file, double *numTestedPerClass, double *numCorrectPerClass)
+{
+	int numVariables, numVectors; 
+	file >> numVariables >> numVectors;
+	
+	int numCorrect = 0;
+	double probability[NUM_CLASSIFICATIONS];
+	int *currVector = new int[numVariables];
+
+	for(int i = 0; i < numVectors; i++) // for each vector
+	{
+		initArray(probability, NUM_CLASSIFICATIONS, 1);
+
+		/* read in the vector */
+		for(int j = 0; j < numVariables; j++)
+			file >> currVector[j];
+		int actualResult = getResult(file);
+		numTestedPerClass[actualResult]++;
+
+		/* calculate probabilities */
+		calculateProbabilities(model, outcomeVector, probability, currVector, numVariables);
+
+		/* calculate and test result */
+		int myResult = getMax(probability, NUM_CLASSIFICATIONS);
+		if(myResult == actualResult) numCorrectPerClass[actualResult]++;
+	}
+
+	delete []currVector;
+}
+void printResults(double *numTestedPerClass, double *numCorrectPerClass)
+{
+	double totalTested = 0;
+	double totalCorrect = 0;
+	
+	for (int i = 0; i < NUM_CLASSIFICATIONS; i++)
+	{
+		cout << "Class " << i << ": tested " << numTestedPerClass[i] << ", correctly classified " << numCorrectPerClass[i] << "." << endl;
+		
+		totalTested += numTestedPerClass[i];
+		totalCorrect += numCorrectPerClass[i];
+	}
+	
+	cout << "Overall: tested " << totalTested << ", correctly classified " << totalCorrect << "." << endl;
+	cout << "Accuracy = " << totalCorrect/totalTested << endl << endl;
+}
+
+void runTest(const char *train, const char *test, bool isMAP)
+{
+	ifstream trainFile(train);
+	ifstream testFile(test);
+
+	/* setup */
+	double outcomeVector[NUM_CLASSIFICATIONS];
+	double numTestedPerClass[NUM_CLASSIFICATIONS], numCorrectPerClass[NUM_CLASSIFICATIONS];
+	initArray(numTestedPerClass, NUM_CLASSIFICATIONS, 0); initArray(numCorrectPerClass, NUM_CLASSIFICATIONS, 0);
+	int numVariables;
+	trainFile >> numVariables;
+	vector<double **> model = setupModel(numVariables);
+	
+	/* train and test model */
+	trainModel(isMAP, model, outcomeVector, numVariables, trainFile);
+	testModel(model, outcomeVector, testFile, numTestedPerClass, numCorrectPerClass);
+
+	
+	/* print out results */	
+	string modelType = isMAP ? "Laplace estimation" : "MLE";
+	cout << "For " << test << " on " << modelType << ":" << endl;
+	printResults(numTestedPerClass, numCorrectPerClass);
+
+	 /* cleanup */
+	 trainFile.close();
+	 testFile.close();
+	 cleanupModel(model, numVariables);
+}
+
 int main()
 {
-/*	ifstream hearttest("datasets/heart-test.txt");
-	ifstream hearttrain("datasets/heart-train.txt")*/;
+	/* simple on MLE */
+	runTest("datasets/simple-train.txt", "datasets/simple-test.txt", IS_MLE);
+	/* simple on Laplace */
+	runTest("datasets/simple-train.txt", "datasets/simple-test.txt", IS_MAP);
 
-	ifstream simpleTest("datasets/simple-test.txt");
-	ifstream simpleTrain("datasets/simple-train.txt");
+	/* vote on MLE */
+	runTest("datasets/vote-train.txt", "datasets/vote-test.txt", IS_MLE);
+	/* vote on Laplace */
+	runTest("datasets/vote-train.txt", "datasets/vote-test.txt", IS_MAP);
 
-	int numVariables, numVectors;
-	simpleTrain >> numVariables >> numVectors;
+	/* heart on MLE */
+	runTest("datasets/heart-train.txt", "datasets/heart-test.txt", IS_MLE);
+	/* heart on Laplace */
+	runTest("datasets/heart-train.txt", "datasets/heart-test.txt", IS_MAP);
 
-	double outcomeVector[NUM_CLASSIFICATIONS];
-	vector<double **> model = setupModel(numVariables);
 
-	/* train and test MLE model */
-	trainModel(IS_MLE, model, outcomeVector, numVariables, numVectors, simpleTrain);
-	/* test MLE model */
-
-	cout << model[1][1][1] << endl;
- 
-	//testMLE(model,
-
-	cout << numVariables << " " << numVectors << endl;
-	cout << "finished" << endl;
-
-	cleanupModel(model, numVariables);
-
-	/* prevent command window from closing */
-	getchar();
+	getchar(); // prevent command window from closing
+	
 	 return 0;
 }
