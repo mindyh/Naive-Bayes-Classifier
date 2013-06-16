@@ -1,8 +1,6 @@
 Small machine learning project for CS109. Learns the given data via the Naive-Bayes assumption, and then tests the model.
 ---
 
-<h3>Input:</h3>
-
 Takes in a text file of the form
 
   <number of input variables per vector>
