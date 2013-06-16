@@ -1,1 +1,17 @@
-Small machine learning project for CS109. Will remain unpopulated until the assignment is turned in, for obvious honor code reasons.
+Small machine learning project for CS109. Learns the given data via the Naive-Bayes assumption, and then tests the model.
+
+
+Takes in a text file of the form
+
+  <number of input variables per vector>
+  <number of data vectors in file>
+  <first data vector>
+  <second data vector>
+  .
+  .
+  .
+  
+Where each data vector is of the form
+
+  x0 x1 x2 x3 x4 ... xn : y0
+
