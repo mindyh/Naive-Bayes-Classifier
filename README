@@ -1,4 +1,4 @@
-Small machine learning project for CS109. Learns the given data via the Naive-Bayes assumption, and then tests the model.
+Small machine learning project for a Statistics class. Learns the given data via the Naive-Bayes assumption, and then tests the model.
 ---
 
 Takes in a text file of the form
