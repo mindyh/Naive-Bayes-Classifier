@@ -13,7 +13,6 @@ using namespace std;
 /** The model is setup as such:
  *		model[the indicator variable][the outcome of the indicator][the outcome of the vector as a whole]
  */
-
 vector<double **> setupModel(int numVariables)
 {
 	vector<double **> model(numVariables);
@@ -32,12 +31,14 @@ vector<double **> setupModel(int numVariables)
 	return model;
 }
 
+/* get the result of the vector */
 int getResult(ifstream &file){
 	string line;
 	getline(file, line);
 	return line[line.length() - 1] - '0'; // last character on the line, guaranteed. Convert from char to int
 }
 
+/* create the model, without normalizing */
 void readModel(vector<double **> model, int numVariables, int numVectors, ifstream &file, double *outcomeVector)
 {
 	int currBin;
@@ -63,6 +64,7 @@ void readModel(vector<double **> model, int numVariables, int numVectors, ifstre
 	delete []currVector;	
 }
 
+/* normalize the model and the P(Y) vector */
 void normalizeVectors(vector<double **> model, double *outcomeVector, int numVariables, int denominator) 
 {
 	/* Normalize model vectors */
@@ -84,6 +86,7 @@ void initModel(vector<double **> model, bool isMAP, int numVariables)
 				model[i][j][k] = isMAP ? 1 : 0;
 }
 
+/* free memory */
 void cleanupModel(vector<double **> model, int numVariables)
 {
 	for(int i = 0; i < numVariables; i++)
@@ -93,11 +96,13 @@ void cleanupModel(vector<double **> model, int numVariables)
 	}
 }
 
+/* set array to whatever value */
 void initArray(double *arr, int numElem, int value)
 {
 	for(int i = 0; i < numElem; i++) arr[i] = value;
 }
 
+/* train the model using naive bayesian classificatoin */
 void trainModel(bool isMAP, vector<double **>model, double *outcomeVector, int numVariables, ifstream &file)
 {
 	int numVectors;
@@ -115,10 +120,7 @@ int getMax(double *arr, int size)
 {
 	int maxIndex = 0;
 	for (int i = 0; i < size; i++)
-	{
 		if(arr[i] > arr[maxIndex]) maxIndex = i;
-	}
-
 	return maxIndex;
 }
 
@@ -127,7 +129,7 @@ void calculateProbabilities(vector<double **>model, double *outcomeVector, doubl
 	for(int j = 0; j < NUM_CLASSIFICATIONS; j++) // get the probability for this classification
 	{
 		for(int k = 0; k < numVariables; k++) // given these indicators, calculate the naive bayes probability
-			probability[j] += log(model[k][currVector[k]][j] / outcomeVector[j]);
+			probability[j] += log(model[k][currVector[k]][j] / outcomeVector[j]); // use logs to prevent underflow
 		probability[j] += log(outcomeVector[j]);
 	}
 }
@@ -224,8 +226,6 @@ int main()
 	/* heart on Laplace */
 	runTest("datasets/heart-train.txt", "datasets/heart-test.txt", IS_MAP);
 
-
 	getchar(); // prevent command window from closing
-	
-	 return 0;
+	return 0;
 }
